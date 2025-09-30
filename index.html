@@ -64,33 +64,25 @@
         }
 
         submitBtn.addEventListener('click', async () => {
-            if (uploadedFiles.length === 0) return;
-            resultDiv.innerHTML = "Processing...";
-            try {
-                let combinedText = '';
-                for (const file of uploadedFiles) {
-                    combinedText += await extractTextFromFile(file) + '\n\n';
-                }
-                const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer aAzvPqO3foGgDYMWAo5cNbksHkOS6Njb'
-                    },
-                    body: JSON.stringify({
-                        model: 'mistral-tiny',
-                        messages: [{
-                            role: 'user',
-                            content: `You are an executive search headhunter at Korn Ferry. Write a [75; 150]-word summary of a candidate based on the following data:\n\n${combinedText}`
-                        }]
-                    })
-                });
-                const data = await response.json();
-                resultDiv.innerHTML = `<strong>Result:</strong><br>${data.choices[0].message.content}`;
-            } catch (error) {
-                resultDiv.innerHTML = `Error: ${error.message}`;
+          if (uploadedFiles.length === 0) return;
+          resultDiv.innerHTML = "Processing...";
+          try {
+            let combinedText = '';
+            for (const file of uploadedFiles) {
+              combinedText += await extractTextFromFile(file) + '\n\n';
             }
+            const response = await fetch('YOUR_VERCEL_FUNCTION_URL', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text: combinedText })
+            });
+            const data = await response.json();
+            resultDiv.innerHTML = `<strong>Result:</strong><br>${data.choices[0].message.content}`;
+          } catch (error) {
+            resultDiv.innerHTML = `Error: ${error.message}`;
+          }
         });
+
     </script>
 </body>
 </html>

@@ -71,7 +71,7 @@
             for (const file of uploadedFiles) {
               combinedText += await extractTextFromFile(file) + '\n\n';
             }
-            const response = await fetch('YOUR_VERCEL_FUNCTION_URL', {
+            const response = await fetch('https://yebin-write-ups.vercel.app/api/generate-summary', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text: combinedText })

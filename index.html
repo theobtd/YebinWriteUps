@@ -1,1 +1,58 @@
+<script>
+    const fileInput = document.getElementById('file-input');
+    const fileList = document.getElementById('file-list');
+    const submitBtn = document.getElementById('submit-btn');
+    const resultDiv = document.getElementById('result');
+
+    let uploadedFiles = [];
+
+    fileInput.addEventListener('change', (e) => {
+        uploadedFiles = Array.from(e.target.files);
+        updateFileList();
+    });
+
+    function updateFileList() {
+        fileList.innerHTML = '<h3>Uploaded Files:</h3>';
+        uploadedFiles.forEach(file => {
+            fileList.innerHTML += `<p>${file.name}</p>`;
+        });
+        submitBtn.disabled = uploadedFiles.length === 0;
+    }
+
+    submitBtn.addEventListener('click', async () => {
+        if (uploadedFiles.length === 0) return;
+
+        resultDiv.innerHTML = "Processing...";
+
+        try {
+            // Read files as text (for demo, only works with text files)
+            const fileTexts = [];
+            for (const file of uploadedFiles) {
+                const text = await file.text();
+                fileTexts.push(text);
+            }
+            const combinedText = fileTexts.join('\n\n');
+
+            const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer aAzvPqO3foGgDYMWAo5cNbksHkOS6Njb' // Your API key
+                },
+                body: JSON.stringify({
+                    model: 'mistral-tiny',
+                    messages: [{
+                        role: 'user',
+                        content: `You are an executive search headhunter at Korn Ferry. Write a [75; 150]-word summary of a candidate based on the following data:\n\n${combinedText}`
+                    }]
+                })
+            });
+
+            const data = await response.json();
+            resultDiv.innerHTML = `<strong>Result:</strong><br>${data.choices[0].message.content}`;
+        } catch (error) {
+            resultDiv.innerHTML = `Error: ${error.message}`;
+        }
+    });
+</script>
 

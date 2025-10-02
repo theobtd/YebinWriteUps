@@ -116,10 +116,10 @@
             messagingSenderId: "754222807819",
             appId: "1:754222807819:web:ccb059d0eff0820689400e"
         };
-
+    
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
-
+    
         // Check authentication state
         auth.onAuthStateChanged((user) => {
             if (!user) {
@@ -127,123 +127,161 @@
                 window.location.href = 'index.html';
             }
         });
-
+    
         // Logout function
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            auth.signOut()
-                .then(() => {
-                    window.location.href = 'index.html';
-                })
-                .catch((error) => {
-                    console.error("Error signing out:", error);
+        document.addEventListener('DOMContentLoaded', function() {
+            const logoutBtn = document.getElementById('logout-btn');
+            logoutBtn.addEventListener('click', () => {
+                auth.signOut()
+                    .then(() => {
+                        window.location.href = 'index.html';
+                    })
+                    .catch((error) => {
+                        console.error("Error signing out:", error);
+                    });
+            });
+    
+            // Your existing script for the Write-Up Generator
+            const fileUpload = document.getElementById('fileUpload');
+            const fileList = document.getElementById('fileList');
+            const sendButton = document.getElementById('sendButton');
+            const responseDiv = document.getElementById('response');
+    
+            let uploadedFiles = [];
+    
+            // Handle file uploads
+            fileUpload.addEventListener('change', (event) => {
+                uploadedFiles = Array.from(event.target.files);
+                updateFileList();
+            });
+    
+            // Update the displayed file list
+            function updateFileList() {
+                fileList.innerHTML = '';
+                uploadedFiles.forEach(file => {
+                    const fileDiv = document.createElement('div');
+                    fileDiv.textContent = file.name;
+                    fileList.appendChild(fileDiv);
                 });
-        });
-
-        const cvUpload = document.getElementById('cvUpload');
-        const notesUpload = document.getElementById('notesUpload');
-        
-        let cvFile = null;
-        let notesFile = null;
-        
-        cvUpload.addEventListener('change', (event) => {
-            cvFile = event.target.files[0];
-            updateFileList();
-        });
-        
-        notesUpload.addEventListener('change', (event) => {
-            notesFile = event.target.files[0];
-            updateFileList();
-        });
-        
-        function updateFileList() {
-            fileList.innerHTML = '';
-            if (cvFile) {
-                const fileDiv = document.createElement('div');
-                fileDiv.textContent = `CV: ${cvFile.name}`;
-                fileList.appendChild(fileDiv);
             }
-            if (notesFile) {
-                const fileDiv = document.createElement('div');
-                fileDiv.textContent = `Meeting Notes: ${notesFile.name}`;
-                fileList.appendChild(fileDiv);
-            }
-        }
-        
-        sendButton.addEventListener('click', async () => {
-            if (!cvFile || !notesFile) {
-                responseDiv.textContent = 'Please upload both a CV and meeting notes.';
-                return;
-            }
-        
-            responseDiv.textContent = 'Extracting text from documents...';
-        
-            try {
-                let cvText, notesText;
-        
-                if (cvFile.type === 'application/pdf') {
-                    cvText = await extractTextFromPDF(cvFile);
-                } else {
-                    cvText = await extractTextFromDOCX(cvFile);
+    
+            // Extract text from PDF
+            async function extractTextFromPDF(file) {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                let text = '';
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const content = await page.getTextContent();
+                    text += content.items.map(item => item.str).join(' ');
                 }
-        
-                if (notesFile.type === 'application/pdf') {
-                    notesText = await extractTextFromPDF(notesFile);
-                } else {
-                    notesText = await extractTextFromDOCX(notesFile);
+                return text;
+            }
+    
+            // Extract text from DOCX
+            async function extractTextFromDOCX(file) {
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await mammoth.extractRawText({ arrayBuffer });
+                return result.value;
+            }
+    
+            // Handle sending extracted text to the backend
+            sendButton.addEventListener('click', async () => {
+                if (uploadedFiles.length === 0) {
+                    responseDiv.textContent = 'Please upload at least one document.';
+                    return;
                 }
-        
+    
+                responseDiv.textContent = 'Extracting text from documents...';
+                let extractedTexts = [];
+                let cvText = '';
+                let meetingNotesText = '';
+    
+                for (const file of uploadedFiles) {
+                    try {
+                        if (file.type === 'application/pdf') {
+                            const text = await extractTextFromPDF(file);
+                            if (!cvText) {
+                                cvText = text;
+                            } else {
+                                meetingNotesText = text;
+                            }
+                            extractedTexts.push(text);
+                        } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                            const text = await extractTextFromDOCX(file);
+                            if (!cvText) {
+                                cvText = text;
+                            } else {
+                                meetingNotesText = text;
+                            }
+                            extractedTexts.push(text);
+                        } else {
+                            responseDiv.textContent = `Unsupported file type: ${file.name}`;
+                            return;
+                        }
+                    } catch (error) {
+                        responseDiv.textContent = `Error extracting text from ${file.name}: ${error.message}`;
+                        return;
+                    }
+                }
+    
+                responseDiv.textContent = 'Generating write-up...';
+    
+                // Define your examples
                 const examples = `
-        Example 1:
-        CV: [text from CV for example 1]
-        Meeting Notes: [text from meeting notes for example 1]
-        Write-Up: [your write-up for example 1]
-        
-        Example 2:
-        CV: [text from CV for example 2]
-        Meeting Notes: [text from meeting notes for example 2]
-        Write-Up: [your write-up for example 2]
-        
-        Example 3:
-        CV: [text from CV for example 3]
-        Meeting Notes: [text from meeting notes for example 3]
-        Write-Up: [your write-up for example 3]
+                    Example 1:
+                    CV: [text from CV for example 1]
+                    Meeting Notes: [text from meeting notes for example 1]
+                    Write-Up: [your write-up for example 1]
+    
+                    Example 2:
+                    CV: [text from CV for example 2]
+                    Meeting Notes: [text from meeting notes for example 2]
+                    Write-Up: [your write-up for example 2]
+    
+                    Example 3:
+                    CV: [text from CV for example 3]
+                    Meeting Notes: [text from meeting notes for example 3]
+                    Write-Up: [your write-up for example 3]
                 `;
-        
+    
+                // Construct the prompt with examples and the new request
                 const apiPrompt = `
-        You are an experienced head hunter associate at Korn Ferry.
-        I will provide you with examples of how I write candidate summaries based on their CV and my meeting notes.
-        Use these examples as a guide to write a new summary in my style.
-        
-        ${examples}
-        
-        ---
-        New Request:
-        CV: ${cvText}
-        Meeting Notes: ${notesText}
-        Write-Up:
+                    You are an experienced head hunter associate at Korn Ferry.
+                    I will provide you with examples of how I write candidate summaries based on their CV and my meeting notes.
+                    Use these examples as a guide to write a new summary in my style.
+    
+                    ${examples}
+    
+                    ---
+                    New Request:
+                    CV: ${cvText}
+                    Meeting Notes: ${meetingNotesText}
+                    Write-Up:
                 `;
-        
-                const backendUrl = 'https://vercel-mistral-backend-cxobp8vav-theobtds-projects.vercel.app/api/chat';
-                const response = await fetch(backendUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ prompt: apiPrompt }),
-                });
-        
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+    
+                try {
+                    const backendUrl = 'https://vercel-mistral-backend-cxobp8vav-theobtds-projects.vercel.app/api/chat';
+                    const response = await fetch(backendUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ prompt: apiPrompt }),
+                    });
+    
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+    
+                    const data = await response.json();
+                    responseDiv.textContent = data.reply;
+                } catch (error) {
+                    responseDiv.textContent = 'Error: ' + error.message;
                 }
-        
-                const data = await response.json();
-                responseDiv.textContent = data.reply;
-            } catch (error) {
-                responseDiv.textContent = 'Error: ' + error.message;
-            }
+            });
         });
-
-
     </script>
+
 </body>
 </html>

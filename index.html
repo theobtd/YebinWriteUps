@@ -124,32 +124,42 @@
                 responseDiv.textContent = 'Please upload at least one document.';
                 return;
             }
-
             responseDiv.textContent = 'Generating write-up...';
-
+            console.log('Starting file upload process...');
+            console.log('Files to upload:', uploadedFiles.map(f => f.name));
+        
             try {
                 const backendUrl = 'https://vercel-mistral-backend-cxobp8vav-theobtds-projects.vercel.app/api/chat';
                 const formData = new FormData();
                 uploadedFiles.forEach(file => {
                     formData.append('documents', file);
+                    console.log('Appended file:', file.name, file.type, file.size);
                 });
                 formData.append('prompt', "You are an experienced head hunter associate at Korn Ferry tasked with building a write up of [100; 200] words for the candidate in the attached document.");
-
+                console.log('Sending request to backend...');
+        
                 const response = await fetch(backendUrl, {
                     method: 'POST',
                     body: formData,
                 });
-
+                console.log('Response status:', response.status);
+        
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
+                    const errorText = await response.text();
+                    console.error('Response not OK. Status:', response.status, 'Body:', errorText);
+                    throw new Error(`Server error: ${response.status} ${errorText}`);
                 }
-
+        
+                console.log('Parsing JSON response...');
                 const data = await response.json();
+                console.log('Response data:', data);
                 responseDiv.textContent = data.reply;
             } catch (error) {
+                console.error('Error in fetch:', error);
                 responseDiv.textContent = 'Error: ' + error.message;
             }
         });
+
     </script>
 </body>
 </html>

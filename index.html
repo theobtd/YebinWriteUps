@@ -84,7 +84,6 @@
 <body>
     <h1>Recruitment Write-Up Generator</h1>
     <div class="prompt">
-        You are an experienced head hunter associate at Korn Ferry.<br>
         Upload candidate documents and generate a write-up of [100; 200] words.
     </div>
     <div class="container">
@@ -169,7 +168,11 @@
 
             responseDiv.textContent = 'Generating write-up...';
             const combinedText = extractedTexts.join('\n\n');
-            const prompt = "You are an experienced head hunter associate at Korn Ferry. Write a [100; 200] words summary for the candidate based on the following documents:\n\n" + combinedText;
+
+            // Construct the API prompt in code, not shown to the user
+            const apiPrompt = `You are an experienced head hunter associate at Korn Ferry. Write a [100; 200] words summary for the candidate based on the following documents:
+
+${combinedText}`;
 
             try {
                 const backendUrl = 'https://vercel-mistral-backend-cxobp8vav-theobtds-projects.vercel.app/api/chat';
@@ -178,7 +181,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ prompt }),
+                    body: JSON.stringify({ prompt: apiPrompt }),
                 });
 
                 if (!response.ok) {

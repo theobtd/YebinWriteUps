@@ -181,17 +181,31 @@
                 responseDiv.textContent = 'Please upload at least one document.';
                 return;
             }
-
+        
             responseDiv.textContent = 'Extracting text from documents...';
             let extractedTexts = [];
-
+            let cvText = '';
+            let meetingNotesText = '';
+        
             for (const file of uploadedFiles) {
                 try {
                     if (file.type === 'application/pdf') {
                         const text = await extractTextFromPDF(file);
+                        // Assume the first PDF is the CV, and the second is the meeting notes
+                        // You may need to adjust this logic based on your needs
+                        if (!cvText) {
+                            cvText = text;
+                        } else {
+                            meetingNotesText = text;
+                        }
                         extractedTexts.push(text);
                     } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                         const text = await extractTextFromDOCX(file);
+                        if (!cvText) {
+                            cvText = text;
+                        } else {
+                            meetingNotesText = text;
+                        }
                         extractedTexts.push(text);
                     } else {
                         responseDiv.textContent = `Unsupported file type: ${file.name}`;
@@ -202,13 +216,42 @@
                     return;
                 }
             }
-
+        
             responseDiv.textContent = 'Generating write-up...';
-            const combinedText = extractedTexts.join('\n\n');
-            const apiPrompt = `You are an experienced head hunter associate at Korn Ferry. Write a [100; 200] words summary for the candidate based on the following documents:
-
-${combinedText}`;
-
+        
+            // Define your examples
+            const examples = `
+        Example 1:
+        CV: [text from CV for example 1]
+        Meeting Notes: [text from meeting notes for example 1]
+        Write-Up: [your write-up for example 1]
+        
+        Example 2:
+        CV: [text from CV for example 2]
+        Meeting Notes: [text from meeting notes for example 2]
+        Write-Up: [your write-up for example 2]
+        
+        Example 3:
+        CV: [text from CV for example 3]
+        Meeting Notes: [text from meeting notes for example 3]
+        Write-Up: [your write-up for example 3]
+            `;
+        
+            // Construct the prompt with examples and the new request
+            const apiPrompt = `
+        You are an experienced head hunter associate at Korn Ferry.
+        I will provide you with examples of how I write candidate summaries based on their CV and my meeting notes.
+        Use these examples as a guide to write a new summary in my style.
+        
+        ${examples}
+        
+        ---
+        New Request:
+        CV: ${cvText}
+        Meeting Notes: ${meetingNotesText}
+        Write-Up:
+            `;
+        
             try {
                 const backendUrl = 'https://vercel-mistral-backend-cxobp8vav-theobtds-projects.vercel.app/api/chat';
                 const response = await fetch(backendUrl, {
@@ -218,17 +261,18 @@ ${combinedText}`;
                     },
                     body: JSON.stringify({ prompt: apiPrompt }),
                 });
-
+        
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
                 }
-
+        
                 const data = await response.json();
                 responseDiv.textContent = data.reply;
             } catch (error) {
                 responseDiv.textContent = 'Error: ' + error.message;
             }
         });
+
     </script>
 </body>
 </html>

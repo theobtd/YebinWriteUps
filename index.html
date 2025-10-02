@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recruitment Write-Up Generator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -99,7 +101,6 @@
         const fileList = document.getElementById('fileList');
         const sendButton = document.getElementById('sendButton');
         const responseDiv = document.getElementById('response');
-
         let uploadedFiles = [];
 
         // Handle file uploads
@@ -118,49 +119,78 @@
             });
         }
 
-        // Handle sending files and prompt to the backend
+        // Extract text from PDF
+        async function extractTextFromPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let text = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map(item => item.str).join(' ');
+            }
+            return text;
+        }
+
+        // Extract text from DOCX
+        async function extractTextFromDOCX(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            return result.value;
+        }
+
+        // Handle sending extracted text to the backend
         sendButton.addEventListener('click', async () => {
             if (uploadedFiles.length === 0) {
                 responseDiv.textContent = 'Please upload at least one document.';
                 return;
             }
+
+            responseDiv.textContent = 'Extracting text from documents...';
+            let extractedTexts = [];
+
+            for (const file of uploadedFiles) {
+                try {
+                    if (file.type === 'application/pdf') {
+                        const text = await extractTextFromPDF(file);
+                        extractedTexts.push(text);
+                    } else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                        const text = await extractTextFromDOCX(file);
+                        extractedTexts.push(text);
+                    } else {
+                        responseDiv.textContent = `Unsupported file type: ${file.name}`;
+                        return;
+                    }
+                } catch (error) {
+                    responseDiv.textContent = `Error extracting text from ${file.name}: ${error.message}`;
+                    return;
+                }
+            }
+
             responseDiv.textContent = 'Generating write-up...';
-            console.log('Starting file upload process...');
-            console.log('Files to upload:', uploadedFiles.map(f => f.name));
-        
+            const combinedText = extractedTexts.join('\n\n');
+            const prompt = "You are an experienced head hunter associate at Korn Ferry. Write a [100; 200] words summary for the candidate based on the following documents:\n\n" + combinedText;
+
             try {
                 const backendUrl = 'https://vercel-mistral-backend-cxobp8vav-theobtds-projects.vercel.app/api/chat';
-                const formData = new FormData();
-                uploadedFiles.forEach(file => {
-                    formData.append('documents', file);
-                    console.log('Appended file:', file.name, file.type, file.size);
-                });
-                formData.append('prompt', "You are an experienced head hunter associate at Korn Ferry tasked with building a write up of [100; 200] words for the candidate in the attached document.");
-                console.log('Sending request to backend...');
-        
                 const response = await fetch(backendUrl, {
                     method: 'POST',
-                    body: formData,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt }),
                 });
-                console.log('Response status:', response.status);
-        
+
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Response not OK. Status:', response.status, 'Body:', errorText);
-                    throw new Error(`Server error: ${response.status} ${errorText}`);
+                    throw new Error('Network response was not ok');
                 }
-        
-                console.log('Parsing JSON response...');
+
                 const data = await response.json();
-                console.log('Response data:', data);
                 responseDiv.textContent = data.reply;
             } catch (error) {
-                console.error('Error in fetch:', error);
                 responseDiv.textContent = 'Error: ' + error.message;
             }
         });
-
     </script>
 </body>
 </html>
-
